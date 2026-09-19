@@ -1,0 +1,28 @@
+@media screen {
+  #print-root {
+    display: none;
+  }
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #print-root,
+  #print-root * {
+    visibility: visible;
+  }
+  #print-root {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+  .label-page {
+    position: relative;
+    overflow: hidden;
+    break-after: page;
+  }
+  .label-page:last-child {
+    break-after: auto;
+  }
+}
