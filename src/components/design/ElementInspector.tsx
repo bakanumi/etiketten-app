@@ -22,7 +22,15 @@ import type {
   QrErrorCorrection,
   VerticalAlign,
 } from "@/lib/label/types";
+import { ALL_COLUMNS_TOKEN, unknownPlaceholders } from "@/lib/label/template";
 import { Trash2 } from "lucide-react";
+
+/** Hängt einen Spalten-Platzhalter an: bei Text in eine neue Zeile, beim QR-Code direkt dahinter. */
+function appendPlaceholder(element: LabelElement, column: string): string {
+  const token = `{{${column}}}`;
+  if (!element.template.trim()) return token;
+  return element.type === "text" ? `${element.template}\n${token}` : `${element.template} ${token}`;
+}
 
 const H_ALIGN: { value: HorizontalAlign; label: string }[] = [
   { value: "left", label: "Links" },
@@ -66,6 +74,8 @@ export function ElementInspector({
     );
   }
 
+  const missing = unknownPlaceholders(element.template, columns);
+
   return (
     <div className="space-y-4 p-3">
       <div className="flex items-center justify-between">
@@ -91,8 +101,38 @@ export function ElementInspector({
           <Input value={element.template} onChange={(e) => onChange({ template: e.target.value })} />
         )}
         {columns.length > 0 && (
-          <p className="text-xs text-muted-foreground">
-            Platzhalter: {columns.map((c) => `{{${c}}}`).join("  ")}
+          <div className="space-y-1.5 pt-1">
+            <p className="text-xs text-muted-foreground">Werte einfügen:</p>
+            <div className="flex flex-wrap gap-1">
+              {element.type === "text" && (
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="secondary"
+                  onClick={() => onChange({ template: ALL_COLUMNS_TOKEN })}
+                  title="Alle Werte der Zeile untereinander, je Wert eine Zeile"
+                >
+                  Alle Werte als Zeilen
+                </Button>
+              )}
+              {columns.map((c) => (
+                <Button
+                  key={c}
+                  type="button"
+                  size="xs"
+                  variant="outline"
+                  onClick={() => onChange({ template: appendPlaceholder(element, c) })}
+                >
+                  {c}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+        {missing.length > 0 && (
+          <p className="text-xs text-destructive">
+            Keine passende Spalte für: {missing.map((m) => `{{${m}}}`).join(", ")} – bleibt auf dem
+            Etikett leer.
           </p>
         )}
       </div>
@@ -130,13 +170,27 @@ export function ElementInspector({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Checkbox
-              checked={element.bold ?? false}
-              onCheckedChange={(c) => onChange({ bold: c === true })}
-              id="bold"
-            />
-            <Label htmlFor="bold">Fett</Label>
+          <div className="grid grid-cols-2 items-end gap-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="line-height">Zeilenabstand</Label>
+              <Input
+                id="line-height"
+                type="number"
+                min={0.8}
+                max={3}
+                step={0.05}
+                value={element.lineHeight ?? 1.15}
+                onChange={(e) => onChange({ lineHeight: Number(e.target.value) || 1.15 })}
+              />
+            </div>
+            <div className="flex h-8 items-center gap-2">
+              <Checkbox
+                checked={element.bold ?? false}
+                onCheckedChange={(c) => onChange({ bold: c === true })}
+                id="bold"
+              />
+              <Label htmlFor="bold">Fett</Label>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2">

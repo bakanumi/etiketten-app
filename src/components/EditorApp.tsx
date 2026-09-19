@@ -11,7 +11,7 @@ import { ElementInspector } from "@/components/design/ElementInspector";
 import { PrintRoot } from "@/components/preview/PrintRoot";
 import { PrintButton } from "@/components/toolbar/PrintButton";
 import { PdfDownloadButton } from "@/components/toolbar/PdfDownloadButton";
-import { parseInput } from "@/lib/parse/parseInput";
+import { DEFAULT_PARSE_OPTIONS, parseInput, type ParseOptions } from "@/lib/parse/parseInput";
 import {
   createQrElement,
   createTextElement,
@@ -20,14 +20,15 @@ import {
   type LabelTemplate,
   type ParsedData,
 } from "@/lib/label/types";
-import { sampleRow } from "@/lib/label/template";
+import { ALL_COLUMNS_TOKEN, sampleRow } from "@/lib/label/template";
+import { LabelPage } from "@/components/preview/LabelRenderer";
 import { loadState, saveState } from "@/lib/storage/localStorage";
 import { Plus, QrCode, Type } from "lucide-react";
 
 interface PersistedShape {
   template: LabelTemplate;
   rawInput: string;
-  hasHeader: boolean;
+  options: ParseOptions;
 }
 
 const DEFAULT_TEMPLATE: LabelTemplate = {
@@ -39,21 +40,53 @@ const DEFAULT_TEMPLATE: LabelTemplate = {
 const DEFAULT_FORM: PersistedShape = {
   template: DEFAULT_TEMPLATE,
   rawInput: "",
-  hasHeader: true,
+  options: DEFAULT_PARSE_OPTIONS,
 };
+
+const THUMBNAIL_LIMIT = 12;
+
+/** Standard-Textblock: alle Werte einer Datenzeile untereinander, zentriert über das ganze Etikett. */
+function withDefaultTextBlock(template: LabelTemplate): LabelTemplate {
+  const block = createTextElement({
+    xMm: 1,
+    yMm: 1,
+    widthMm: Math.max(2, template.widthMm - 2),
+    heightMm: Math.max(2, template.heightMm - 2),
+    template: ALL_COLUMNS_TOKEN,
+    fontSizePt: 12,
+    align: "center",
+    verticalAlign: "middle",
+  });
+  return { ...template, elements: [...template.elements, block] };
+}
+
+/** Ältere gespeicherte Stände (nur `hasHeader`) auf das aktuelle Format heben. */
+function normalizePersisted(
+  persisted: Partial<PersistedShape> & { hasHeader?: boolean }
+): PersistedShape {
+  return {
+    template: persisted.template ?? DEFAULT_TEMPLATE,
+    rawInput: persisted.rawInput ?? "",
+    options: {
+      ...DEFAULT_PARSE_OPTIONS,
+      ...(persisted.options ?? {}),
+      ...(persisted.options ? {} : { hasHeader: persisted.hasHeader ?? false }),
+    },
+  };
+}
 
 export function EditorApp() {
   const [form, setForm] = useState<PersistedShape>(DEFAULT_FORM);
-  const { template, rawInput, hasHeader } = form;
+  const { template, rawInput, options } = form;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const hydrated = useRef(false);
 
   useEffect(() => {
     // Einmaliges Hydrieren aus localStorage nach dem Mount (SSR hat kein window,
     // ein Lazy-Initializer würde daher einen Hydration-Mismatch verursachen).
-    const persisted = loadState<PersistedShape>();
+    const persisted = loadState<Partial<PersistedShape>>();
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (persisted) setForm(persisted);
+    if (persisted) setForm(normalizePersisted(persisted));
     hydrated.current = true;
   }, []);
 
@@ -71,15 +104,25 @@ export function EditorApp() {
     []
   );
   const setRawInput = useCallback(
-    (rawInput: string) => setForm((f) => ({ ...f, rawInput })),
+    (value: string) =>
+      setForm((f) => {
+        // Erste Dateneingabe bei noch leerem Etikett: automatisch einen Textblock mit allen Werten anlegen,
+        // damit die Daten sofort auf dem Etikett erscheinen (statt einer leeren Ausgabe).
+        const firstData = f.rawInput.trim() === "" && value.trim() !== "";
+        const template =
+          firstData && f.template.elements.length === 0
+            ? withDefaultTextBlock(f.template)
+            : f.template;
+        return { ...f, rawInput: value, template };
+      }),
     []
   );
-  const setHasHeader = useCallback(
-    (hasHeader: boolean) => setForm((f) => ({ ...f, hasHeader })),
+  const setOptions = useCallback(
+    (patch: Partial<ParseOptions>) => setForm((f) => ({ ...f, options: { ...f.options, ...patch } })),
     []
   );
 
-  const data = useMemo<ParsedData>(() => parseInput(rawInput, hasHeader), [rawInput, hasHeader]);
+  const data = useMemo<ParsedData>(() => parseInput(rawInput, options), [rawInput, options]);
   const previewRow = data.rows[0] ?? sampleRow(data.columns);
   const selectedElement = template.elements.find((e) => e.id === selectedId) ?? null;
 
@@ -94,7 +137,9 @@ export function EditorApp() {
   );
 
   const addTextElement = () => {
-    const el = createTextElement();
+    const el = createTextElement({
+      template: data.columns.length > 0 ? ALL_COLUMNS_TOKEN : "Neuer Text",
+    });
     setTemplate((t) => ({ ...t, elements: [...t.elements, el] }));
     setSelectedId(el.id);
   };
@@ -131,15 +176,44 @@ export function EditorApp() {
         </TabsList>
 
         <TabsContent value="daten">
-          <Card className="p-4">
-            <DataImportPanel
-              rawInput={rawInput}
-              hasHeader={hasHeader}
-              data={data}
-              onRawInputChange={setRawInput}
-              onHasHeaderChange={setHasHeader}
-            />
-          </Card>
+          <div className="space-y-3">
+            <Card className="p-4">
+              <DataImportPanel
+                rawInput={rawInput}
+                options={options}
+                data={data}
+                onRawInputChange={setRawInput}
+                onOptionsChange={setOptions}
+              />
+            </Card>
+
+            {data.rows.length > 0 && (
+              <Card className="space-y-3 p-4">
+                <h2 className="text-sm font-medium">
+                  Vorschau der Etiketten ({data.rows.length})
+                </h2>
+                {template.elements.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Das Etikett hat noch keine Elemente – im Tab „2. Design“ Text oder QR-Code
+                    hinzufügen, damit die Daten erscheinen.
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-3">
+                    {data.rows.slice(0, THUMBNAIL_LIMIT).map((row, i) => (
+                      <div key={i} className="rounded-sm shadow-[0_0_0_1px_var(--border)]">
+                        <LabelPage template={template} row={row} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {data.rows.length > THUMBNAIL_LIMIT && (
+                  <p className="text-xs text-muted-foreground">
+                    … und {data.rows.length - THUMBNAIL_LIMIT} weitere
+                  </p>
+                )}
+              </Card>
+            )}
+          </div>
         </TabsContent>
 
         <TabsContent value="design">
