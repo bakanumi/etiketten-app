@@ -150,6 +150,19 @@ export function EditorApp() {
     setSelectedId(el.id);
   };
 
+  /** Ebenenreihenfolge = Reihenfolge im Array (später = weiter vorne, in Vorschau, Druck und PDF gleich). */
+  const moveSelectedLayer = (direction: "front" | "back") => {
+    if (!selectedId) return;
+    setTemplate((t) => {
+      const i = t.elements.findIndex((el) => el.id === selectedId);
+      const j = direction === "front" ? i + 1 : i - 1;
+      if (i < 0 || j < 0 || j >= t.elements.length) return t;
+      const elements = [...t.elements];
+      [elements[i], elements[j]] = [elements[j], elements[i]];
+      return { ...t, elements };
+    });
+  };
+
   const deleteSelected = () => {
     if (!selectedId) return;
     setTemplate((t) => ({ ...t, elements: t.elements.filter((el) => el.id !== selectedId) }));
@@ -254,7 +267,10 @@ export function EditorApp() {
                 <ElementInspector
                   element={selectedElement}
                   columns={data.columns}
+                  labelWidthMm={template.widthMm}
+                  labelHeightMm={template.heightMm}
                   onChange={(patch) => selectedId && updateElement(selectedId, patch)}
+                  onMoveLayer={moveSelectedLayer}
                   onDelete={deleteSelected}
                 />
               </Card>

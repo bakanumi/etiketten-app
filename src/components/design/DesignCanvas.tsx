@@ -113,9 +113,10 @@ export function DesignCanvas({
                 }}
                 className={cn(
                   "absolute cursor-move",
+                  // Feste Farben statt Theme-Variablen: das Etikett ist immer weiß, auch im Dark-Mode.
                   selectedId === el.id
-                    ? "outline outline-primary"
-                    : "outline outline-transparent hover:outline-dashed hover:outline-muted-foreground/40"
+                    ? "outline outline-blue-600"
+                    : "outline outline-transparent hover:outline-dashed hover:outline-neutral-400"
                 )}
                 style={{
                   left: `${el.xMm}mm`,

@@ -5,6 +5,14 @@
 }
 
 @media print {
+  /* Der dunkle App-Hintergrund darf nie mitgedruckt werden (z. B. bei aktivierten Hintergrundgrafiken). */
+  html,
+  html.dark,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    color-scheme: light;
+  }
   body * {
     visibility: hidden;
   }

@@ -23,7 +23,18 @@ import type {
   VerticalAlign,
 } from "@/lib/label/types";
 import { ALL_COLUMNS_TOKEN, unknownPlaceholders } from "@/lib/label/template";
-import { Trash2 } from "lucide-react";
+import {
+  AlignCenterHorizontal,
+  AlignCenterVertical,
+  AlignEndHorizontal,
+  AlignEndVertical,
+  AlignStartHorizontal,
+  AlignStartVertical,
+  BringToFront,
+  SendToBack,
+  Trash2,
+  type LucideIcon,
+} from "lucide-react";
 
 /** Hängt einen Spalten-Platzhalter an: bei Text in eine neue Zeile, beim QR-Code direkt dahinter. */
 function appendPlaceholder(element: LabelElement, column: string): string {
@@ -55,15 +66,56 @@ const FONT_LABELS: Record<string, string> = Object.fromEntries(
   FONT_OPTIONS.map((f) => [f.id, f.label])
 );
 
+/** Ausrichtung des Elements an den Rändern bzw. der Mitte des Etiketts. */
+const ALIGN_ACTIONS: {
+  key: string;
+  label: string;
+  icon: LucideIcon;
+  patch: (el: LabelElement, w: number, h: number) => ElementPatch;
+}[] = [
+  { key: "left", label: "Links am Etikett", icon: AlignStartVertical, patch: () => ({ xMm: 0 }) },
+  {
+    key: "hcenter",
+    label: "Horizontal zentrieren",
+    icon: AlignCenterVertical,
+    patch: (el, w) => ({ xMm: round((w - el.widthMm) / 2) }),
+  },
+  {
+    key: "right",
+    label: "Rechts am Etikett",
+    icon: AlignEndVertical,
+    patch: (el, w) => ({ xMm: round(w - el.widthMm) }),
+  },
+  { key: "top", label: "Oben am Etikett", icon: AlignStartHorizontal, patch: () => ({ yMm: 0 }) },
+  {
+    key: "vcenter",
+    label: "Vertikal zentrieren",
+    icon: AlignCenterHorizontal,
+    patch: (el, _w, h) => ({ yMm: round((h - el.heightMm) / 2) }),
+  },
+  {
+    key: "bottom",
+    label: "Unten am Etikett",
+    icon: AlignEndHorizontal,
+    patch: (el, _w, h) => ({ yMm: round(h - el.heightMm) }),
+  },
+];
+
 export function ElementInspector({
   element,
   columns,
+  labelWidthMm,
+  labelHeightMm,
   onChange,
+  onMoveLayer,
   onDelete,
 }: {
   element: LabelElement | null;
   columns: string[];
+  labelWidthMm: number;
+  labelHeightMm: number;
   onChange: (patch: ElementPatch) => void;
+  onMoveLayer: (direction: "front" | "back") => void;
   onDelete: () => void;
 }) {
   if (!element) {
@@ -261,6 +313,46 @@ export function ElementInspector({
       )}
 
       <Separator />
+
+      <div className="space-y-1.5">
+        <Label>Anordnung auf dem Etikett</Label>
+        <div className="flex flex-wrap items-center gap-1">
+          {ALIGN_ACTIONS.map(({ key, label, icon: Icon, patch }) => (
+            <Button
+              key={key}
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              title={label}
+              aria-label={label}
+              onClick={() => onChange(patch(element, labelWidthMm, labelHeightMm))}
+            >
+              <Icon />
+            </Button>
+          ))}
+          <span className="mx-1 h-5 w-px bg-border" aria-hidden />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            title="Eine Ebene nach vorne (liegt über anderen Elementen)"
+            aria-label="Nach vorne"
+            onClick={() => onMoveLayer("front")}
+          >
+            <BringToFront />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            title="Eine Ebene nach hinten"
+            aria-label="Nach hinten"
+            onClick={() => onMoveLayer("back")}
+          >
+            <SendToBack />
+          </Button>
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 gap-2">
         <div className="space-y-1.5">

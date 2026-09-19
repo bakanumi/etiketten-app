@@ -58,6 +58,11 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Dunkle Scrollbalken, Zahlenfelder und Auswahllisten passend zum Dark-Mode der App. */
+html.dark {
+  color-scheme: dark;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
