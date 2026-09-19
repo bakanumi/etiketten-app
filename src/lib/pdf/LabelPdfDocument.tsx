@@ -64,7 +64,7 @@ export function LabelPdfDocument({
                 >
                   <Text
                     style={{
-                      fontFamily: font.cssFamily,
+                      fontFamily: font.pdfFamily,
                       fontWeight: el.bold ? "bold" : "normal",
                       fontSize: el.fontSizePt,
                       lineHeight: el.lineHeight ?? 1.15,

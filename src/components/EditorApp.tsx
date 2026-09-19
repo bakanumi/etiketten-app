@@ -4,13 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { DataImportPanel } from "@/components/data-import/DataImportPanel";
 import { LabelSizePanel } from "@/components/design/LabelSizePanel";
 import { DesignCanvas } from "@/components/design/DesignCanvas";
@@ -43,8 +36,6 @@ const DEFAULT_TEMPLATE: LabelTemplate = {
   elements: [],
 };
 
-const ZOOM_OPTIONS = [2, 3, 4, 6, 8];
-
 const DEFAULT_FORM: PersistedShape = {
   template: DEFAULT_TEMPLATE,
   rawInput: "",
@@ -55,7 +46,6 @@ export function EditorApp() {
   const [form, setForm] = useState<PersistedShape>(DEFAULT_FORM);
   const { template, rawInput, hasHeader } = form;
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(4);
   const hydrated = useRef(false);
 
   useEffect(() => {
@@ -122,7 +112,7 @@ export function EditorApp() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-4 pb-16">
+    <div className="mx-auto w-full min-w-0 max-w-[1600px] space-y-4 p-4 pb-16">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-semibold">Etiketten-Generator</h1>
@@ -160,25 +150,10 @@ export function EditorApp() {
                 heightMm={template.heightMm}
                 onChange={(patch) => setTemplate((t) => ({ ...t, ...patch }))}
               />
-              <div className="space-y-1.5">
-                <span className="text-sm text-muted-foreground">Zoom</span>
-                <Select value={String(zoom)} onValueChange={(v) => v && setZoom(Number(v))}>
-                  <SelectTrigger className="w-20">
-                    <SelectValue>{(v: string) => `${v}×`}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ZOOM_OPTIONS.map((z) => (
-                      <SelectItem key={z} value={String(z)}>
-                        {z}×
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
             </Card>
 
-            <div className="flex flex-wrap gap-3 lg:flex-nowrap">
-              <Card className="min-w-0 flex-1 p-4">
+            <div className="flex flex-col gap-3 lg:flex-row">
+              <Card className="min-w-0 p-4 lg:flex-1">
                 <div className="mb-3 flex gap-2">
                   <Button variant="outline" size="sm" onClick={addTextElement}>
                     <Type /> Text hinzufügen
@@ -187,16 +162,13 @@ export function EditorApp() {
                     <QrCode /> QR-Code hinzufügen
                   </Button>
                 </div>
-                <div className="overflow-auto rounded-md border bg-muted/30 p-6">
-                  <DesignCanvas
-                    template={template}
-                    row={previewRow}
-                    zoom={zoom}
-                    selectedId={selectedId}
-                    onSelect={setSelectedId}
-                    onChange={updateElement}
-                  />
-                </div>
+                <DesignCanvas
+                  template={template}
+                  row={previewRow}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                  onChange={updateElement}
+                />
                 {template.elements.length === 0 && (
                   <p className="mt-3 text-sm text-muted-foreground">
                     <Plus className="inline size-3.5" /> Füge oben ein Textelement oder einen

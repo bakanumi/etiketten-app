@@ -1,4 +1,5 @@
 export type FontId =
+  | "arial"
   | "fira-sans"
   | "ibm-plex-sans-condensed"
   | "ibm-plex-mono"
@@ -85,7 +86,7 @@ export function createTextElement(partial?: Partial<TextElement>): TextElement {
     heightMm: 8,
     paddingMm: DEFAULT_PADDING_MM,
     template: "Neuer Text",
-    fontFamily: "fira-sans",
+    fontFamily: "arial",
     fontSizePt: 10,
     bold: false,
     lineHeight: 1.15,
