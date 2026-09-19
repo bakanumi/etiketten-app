@@ -76,9 +76,20 @@ export interface ParsedData {
 
 export const DEFAULT_PADDING_MM = 1;
 
+/**
+ * crypto.randomUUID gibt es nur in sicheren Kontexten (HTTPS/localhost). Beim Aufruf
+ * der App über eine Server-IP per http:// wäre es undefined - daher Fallback.
+ */
+function newId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `el-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export function createTextElement(partial?: Partial<TextElement>): TextElement {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     type: "text",
     xMm: 2,
     yMm: 2,
@@ -98,7 +109,7 @@ export function createTextElement(partial?: Partial<TextElement>): TextElement {
 
 export function createQrElement(partial?: Partial<QrElement>): QrElement {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     type: "qr",
     xMm: 2,
     yMm: 2,
