@@ -79,13 +79,17 @@ export function LabelPdfDocument({
             }
 
             const src = qrDataUris[`${ri}-${el.id}`];
+            // QR-Code bleibt quadratisch: größte Seitenlänge, die in die Box (abzüglich Rand) passt, zentriert.
+            const qrSidePt = mm2pt(
+              Math.max(0, Math.min(el.widthMm, el.heightMm) - 2 * (el.paddingMm ?? 0))
+            );
             return (
               <View
                 key={el.id}
                 style={{ ...boxStyle, justifyContent: "center", alignItems: "center" }}
               >
                 {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image, kein DOM-<img> */}
-                {src && <Image src={src} style={{ width: "100%", height: "100%" }} />}
+                {src && <Image src={src} style={{ width: qrSidePt, height: qrSidePt }} />}
               </View>
             );
           })}

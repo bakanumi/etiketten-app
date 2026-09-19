@@ -7,5 +7,7 @@ export function qrDataUri(text: string, errorCorrectionLevel: QrErrorCorrection 
     margin: 0,
     errorCorrectionLevel,
     type: "image/png",
+    // Hohe Auflösung, damit die Module beim Drucken/PDF scharf bleiben (sonst 1 px pro Modul, hochskaliert).
+    width: 800,
   });
 }

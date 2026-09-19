@@ -129,7 +129,12 @@ function QrImage({
     <img
       src={src}
       alt=""
-      style={{ width: "100%", height: "100%", objectFit: "contain" }}
+      style={{
+        width: "100%",
+        height: "100%",
+        objectFit: "contain",
+        imageRendering: "pixelated", // scharfe Modulkanten statt weichgezeichnet
+      }}
     />
   );
 }
