@@ -8,6 +8,7 @@ import { DataImportPanel } from "@/components/data-import/DataImportPanel";
 import { LabelSizePanel } from "@/components/design/LabelSizePanel";
 import { DesignCanvas } from "@/components/design/DesignCanvas";
 import { ElementInspector } from "@/components/design/ElementInspector";
+import { TemplatePanel } from "@/components/templates/TemplatePanel";
 import { PrintRoot } from "@/components/preview/PrintRoot";
 import { PrintButton } from "@/components/toolbar/PrintButton";
 import { PdfDownloadButton } from "@/components/toolbar/PdfDownloadButton";
@@ -181,6 +182,17 @@ export function EditorApp() {
           <PdfDownloadButton template={template} data={data} />
         </div>
       </header>
+
+      <Card className="p-4">
+        <TemplatePanel
+          template={template}
+          options={options}
+          onApply={(nextTemplate, nextOptions) => {
+            setForm((f) => ({ ...f, template: nextTemplate, options: nextOptions }));
+            setSelectedId(null);
+          }}
+        />
+      </Card>
 
       <Tabs defaultValue="daten">
         <TabsList>

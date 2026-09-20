@@ -66,7 +66,8 @@ html.dark {
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  /* Standardschrift der Oberfläche: Arial (bzw. metrisch gleiche Ersatzschriften). */
+  --font-sans: Arial, "Liberation Sans", Helvetica, sans-serif;
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -185,5 +186,7 @@ html.dark {
   }
   html {
     @apply font-sans;
+    /* 18 px statt 16 px: skaliert die gesamte Oberfläche (rem) etwas größer. Etiketten nutzen mm und bleiben unberührt. */
+    font-size: 112.5%;
   }
 }

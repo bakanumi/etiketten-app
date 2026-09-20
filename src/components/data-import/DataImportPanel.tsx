@@ -134,7 +134,7 @@ export function DataImportPanel({
           }
           value={rawInput}
           onChange={(e) => onRawInputChange(e.target.value)}
-          className="font-mono text-xs"
+          className="font-mono text-[12px]" /* Textliste bewusst unverändert klein, unabhängig von der Oberflächengröße */
         />
       </div>
 
