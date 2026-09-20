@@ -32,15 +32,23 @@ export function LabelPdfDocument({
   return (
     <Document>
       {rows.map((row, ri) => (
-        // wrap={false}: jedes Etikett ist genau eine Seite. Ohne das versucht react-pdf, Elemente, die nicht
-        // (ganz) auf die Seite passen, auf Folgeseiten umzubrechen - bei absolut positionierten Elementen
-        // außerhalb des Etiketts endet das in einer Endlosschleife (100 % CPU, dann Speicher voll).
+        // wrap={false}: jedes Etikett ist genau eine Seite. Ohne das bricht react-pdf Elemente, die nicht
+        // (ganz) auf die Seite passen, auf Folgeseiten um - bei absolut positionierten Elementen außerhalb
+        // des Etiketts endet das in einer Endlosschleife (100 % CPU, dann Speicher voll), bei Elementen am
+        // Rand entstehen zusätzliche Seiten.
+        // Nebenwirkung von wrap={false}: die Seitenhöhe richtet sich dann nach dem Inhalt im normalen Fluss
+        // statt nach `size` - bei rein absolut positionierten Elementen wäre sie 0 (Viewer zeigen dann A4).
+        // Der unsichtbare Platzhalter unten hält die Seite auf der Etikettengröße.
         <Page
           key={ri}
           size={[mm2pt(template.widthMm), mm2pt(template.heightMm)]}
           style={{ padding: 0 }}
           wrap={false}
         >
+          <View
+            wrap={false}
+            style={{ width: mm2pt(template.widthMm), height: mm2pt(template.heightMm) }}
+          />
           {template.elements.map((el) => {
             const padding = mm2pt(el.paddingMm ?? 0);
             const boxStyle = {
