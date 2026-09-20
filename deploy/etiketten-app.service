@@ -9,6 +9,9 @@ Group=etiketten
 WorkingDirectory=/opt/etiketten-app
 Environment=NODE_ENV=production
 Environment=ETIKETTEN_DATA_DIR=/var/lib/etiketten-app
+# Enthält ETIKETTEN_PASSWORD=... (Passwortschutz). Ohne Bindestrich: fehlt die Datei, startet der
+# Dienst nicht - statt die App versehentlich ungeschützt zu starten.
+EnvironmentFile=/etc/etiketten-app.env
 # Node-Pfad ggf. anpassen (which node). Nur auf localhost hören: erreichbar ist die App nur über nginx.
 ExecStart=/usr/bin/node node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3001
 Restart=always

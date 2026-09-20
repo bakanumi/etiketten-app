@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,7 @@ import {
 import { ALL_COLUMNS_TOKEN, sampleRow } from "@/lib/label/template";
 import { LabelPage } from "@/components/preview/LabelRenderer";
 import { loadState, saveState } from "@/lib/storage/localStorage";
-import { Plus, QrCode, Type } from "lucide-react";
+import { LogOut, Plus, QrCode, Type } from "lucide-react";
 
 interface PersistedShape {
   template: LabelTemplate;
@@ -76,7 +77,8 @@ function normalizePersisted(
   };
 }
 
-export function EditorApp() {
+export function EditorApp({ showLogout = false }: { showLogout?: boolean }) {
+  const router = useRouter();
   const [form, setForm] = useState<PersistedShape>(DEFAULT_FORM);
   const { template, rawInput, options } = form;
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -180,6 +182,17 @@ export function EditorApp() {
         <div className="flex gap-2">
           <PrintButton rowCount={data.rows.length || 1} />
           <PdfDownloadButton template={template} data={data} />
+          {showLogout && (
+            <Button
+              variant="ghost"
+              onClick={async () => {
+                await fetch("/api/login", { method: "DELETE" });
+                router.replace("/login");
+              }}
+            >
+              <LogOut /> Abmelden
+            </Button>
+          )}
         </div>
       </header>
 
