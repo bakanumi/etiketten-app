@@ -36,12 +36,15 @@ export function DesignCanvas({
   row,
   selectedId,
   onSelect,
+  onGestureStart,
   onChange,
 }: {
   template: LabelTemplate;
   row: Record<string, string>;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  /** Wird beim Anfassen eines Elements oder Griffs aufgerufen, bevor Ziehen/Skalieren beginnt. */
+  onGestureStart?: () => void;
   onChange: (id: string, patch: DragPatch) => void;
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
@@ -108,6 +111,7 @@ export function DesignCanvas({
               <div
                 key={el.id}
                 onMouseDown={(e) => {
+                  onGestureStart?.();
                   onSelect(el.id);
                   startMove(e, el.id, el.xMm, el.yMm, el.widthMm, el.heightMm);
                 }}
@@ -132,6 +136,7 @@ export function DesignCanvas({
                       key={corner}
                       onMouseDown={(e) => {
                         e.stopPropagation();
+                        onGestureStart?.();
                         onSelect(el.id);
                         startResize(e, el.id, corner, el.xMm, el.yMm, el.widthMm, el.heightMm);
                       }}

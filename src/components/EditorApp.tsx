@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
@@ -25,12 +25,28 @@ import {
 import { ALL_COLUMNS_TOKEN, sampleRow } from "@/lib/label/template";
 import { LabelPage } from "@/components/preview/LabelRenderer";
 import { loadState, saveState } from "@/lib/storage/localStorage";
-import { LogOut, Plus, QrCode, Type } from "lucide-react";
+import {
+  GESTURE_PREFIX,
+  createEditorState,
+  editorReducer,
+  nudgeElement,
+  type PersistedShape,
+} from "@/lib/editor/state";
+import { LogOut, Plus, QrCode, Redo2, Type, Undo2 } from "lucide-react";
 
-interface PersistedShape {
-  template: LabelTemplate;
-  rawInput: string;
-  options: ParseOptions;
+/** Pfeiltasten-Schrittweite in mm (mit Shift größer). */
+const NUDGE_MM = 0.5;
+const NUDGE_SHIFT_MM = 2;
+
+/** In Eingabefeldern und Auswahllisten behalten Strg+Z und Pfeiltasten ihre normale Bedeutung. */
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.isContentEditable ||
+    target.closest(
+      "input, textarea, select, [role=combobox], [role=listbox], [role=option], [role=tab], [role=slider]"
+    ) !== null
+  );
 }
 
 const DEFAULT_TEMPLATE: LabelTemplate = {
@@ -91,17 +107,18 @@ function normalizePersisted(
 
 export function EditorApp({ showLogout = false }: { showLogout?: boolean }) {
   const router = useRouter();
-  const [form, setForm] = useState<PersistedShape>(DEFAULT_FORM);
+  const [state, dispatch] = useReducer(editorReducer, DEFAULT_FORM, createEditorState);
+  const { form } = state;
   const { template, rawInput, options } = form;
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [tab, setTab] = useState("daten");
   const hydrated = useRef(false);
 
   useEffect(() => {
     // Einmaliges Hydrieren aus localStorage nach dem Mount (SSR hat kein window,
     // ein Lazy-Initializer würde daher einen Hydration-Mismatch verursachen).
     const persisted = loadState<Partial<PersistedShape>>();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (persisted) setForm(normalizePersisted(persisted));
+    if (persisted) dispatch({ type: "hydrate", form: normalizePersisted(persisted) });
     hydrated.current = true;
   }, []);
 
@@ -113,14 +130,26 @@ export function EditorApp({ showLogout = false }: { showLogout?: boolean }) {
     return () => clearTimeout(timeout);
   }, [form]);
 
-  const setTemplate = useCallback(
-    (updater: (t: LabelTemplate) => LabelTemplate) =>
-      setForm((f) => ({ ...f, template: updater(f.template) })),
+  /**
+   * Zentrale Änderung am Editor-Zustand. Ändert sich dabei das Design, entsteht ein Schritt im
+   * Rückgängig-Verlauf; gleiche `key`-Werte kurz hintereinander (Tippen, Pfeiltasten) werden zusammengefasst.
+   */
+  const update = useCallback(
+    (updater: (f: PersistedShape) => PersistedShape, key?: string) =>
+      dispatch({ type: "update", updater, key, at: Date.now() }),
     []
+  );
+  const setTemplate = useCallback(
+    (updater: (t: LabelTemplate) => LabelTemplate, key?: string) =>
+      update((f) => {
+        const next = updater(f.template);
+        return next === f.template ? f : { ...f, template: next };
+      }, key),
+    [update]
   );
   const setRawInput = useCallback(
     (value: string) =>
-      setForm((f) => {
+      update((f) => {
         // Erste Dateneingabe bei noch leerem Etikett: automatisch einen Textblock mit allen Werten anlegen,
         // damit die Daten sofort auf dem Etikett erscheinen (statt einer leeren Ausgabe).
         const firstData = f.rawInput.trim() === "" && value.trim() !== "";
@@ -130,11 +159,12 @@ export function EditorApp({ showLogout = false }: { showLogout?: boolean }) {
             : f.template;
         return { ...f, rawInput: value, template };
       }),
-    []
+    [update]
   );
   const setOptions = useCallback(
-    (patch: Partial<ParseOptions>) => setForm((f) => ({ ...f, options: { ...f.options, ...patch } })),
-    []
+    (patch: Partial<ParseOptions>) =>
+      update((f) => ({ ...f, options: { ...f.options, ...patch } })),
+    [update]
   );
 
   const data = useMemo<ParsedData>(() => parseInput(rawInput, options), [rawInput, options]);
@@ -142,14 +172,63 @@ export function EditorApp({ showLogout = false }: { showLogout?: boolean }) {
   const selectedElement = template.elements.find((e) => e.id === selectedId) ?? null;
 
   const updateElement = useCallback(
-    (id: string, patch: ElementPatch) => {
-      setTemplate((t) => ({
-        ...t,
-        elements: t.elements.map((el) => (el.id === id ? ({ ...el, ...patch } as LabelElement) : el)),
-      }));
+    (id: string, patch: ElementPatch, key?: string) => {
+      setTemplate(
+        (t) => ({
+          ...t,
+          elements: t.elements.map((el) => (el.id === id ? ({ ...el, ...patch } as LabelElement) : el)),
+        }),
+        // Gleiche Felder desselben Elements kurz hintereinander (z. B. Tippen) = ein Rückgängig-Schritt.
+        key ?? `el:${id}:${Object.keys(patch).sort().join(",")}`
+      );
     },
     [setTemplate]
   );
+
+  /** Beginn einer Maus-Geste (Ziehen/Skalieren): ab jetzt ein eigener Rückgängig-Schritt. */
+  const handleGestureStart = useCallback(() => {
+    dispatch({ type: "breakCoalesce" });
+    // Die Maus-Geste verhindert den Fokuswechsel; sonst bliebe der Fokus in einem Eingabefeld des
+    // Inspectors und die Pfeiltasten würden dort statt am Element wirken.
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  }, []);
+
+  // Tastatur im Design-Tab: Strg+Z / Strg+Y (bzw. Strg+Umschalt+Z) und Pfeiltasten für das gewählte Element.
+  useEffect(() => {
+    if (tab !== "design") return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || isTypingTarget(e.target)) return;
+
+      const key = e.key.toLowerCase();
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && !e.altKey && (key === "z" || key === "y")) {
+        e.preventDefault();
+        dispatch({ type: key === "y" || e.shiftKey ? "redo" : "undo" });
+        return;
+      }
+
+      if (mod || e.altKey || !selectedId) return;
+      const step = e.shiftKey ? NUDGE_SHIFT_MM : NUDGE_MM;
+      const deltas: Partial<Record<string, [number, number]>> = {
+        ArrowLeft: [-step, 0],
+        ArrowRight: [step, 0],
+        ArrowUp: [0, -step],
+        ArrowDown: [0, step],
+      };
+      const delta = deltas[e.key];
+      if (!delta) return;
+
+      e.preventDefault(); // Seite soll dabei nicht scrollen
+      update((f) => {
+        const next = nudgeElement(f.template, selectedId, delta[0], delta[1]);
+        return next === f.template ? f : { ...f, template: next };
+      }, `nudge:${selectedId}`);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [tab, selectedId, update]);
 
   const addTextElement = () => {
     const el = createTextElement({
@@ -233,13 +312,14 @@ export function EditorApp({ showLogout = false }: { showLogout?: boolean }) {
           template={template}
           options={options}
           onApply={(nextTemplate, nextOptions) => {
-            setForm((f) => ({ ...f, template: nextTemplate, options: nextOptions }));
+            // Als eigener Schritt im Verlauf: das Laden einer Vorlage lässt sich mit Strg+Z zurücknehmen.
+            update((f) => ({ ...f, template: nextTemplate, options: nextOptions }));
             setSelectedId(null);
           }}
         />
       </Card>
 
-      <Tabs defaultValue="daten">
+      <Tabs value={tab} onValueChange={(value) => setTab(String(value))}>
         <TabsList>
           <TabsTrigger value="daten">1. Daten</TabsTrigger>
           <TabsTrigger value="design">2. Design</TabsTrigger>
@@ -292,7 +372,7 @@ export function EditorApp({ showLogout = false }: { showLogout?: boolean }) {
               <LabelSizePanel
                 widthMm={template.widthMm}
                 heightMm={template.heightMm}
-                onChange={(patch) => setTemplate((t) => ({ ...t, ...patch }))}
+                onChange={(patch) => setTemplate((t) => ({ ...t, ...patch }), "size")}
               />
               {outsideCount > 0 && (
                 <div className="flex flex-wrap items-center gap-3 text-sm text-amber-400">
@@ -310,12 +390,33 @@ export function EditorApp({ showLogout = false }: { showLogout?: boolean }) {
 
             <div className="flex flex-col gap-3 lg:flex-row">
               <Card className="min-w-0 p-4 lg:flex-1">
-                <div className="mb-3 flex gap-2">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
                   <Button variant="outline" size="sm" onClick={addTextElement}>
                     <Type /> Text hinzufügen
                   </Button>
                   <Button variant="outline" size="sm" onClick={addQrElement}>
                     <QrCode /> QR-Code hinzufügen
+                  </Button>
+                  <span className="mx-1 h-5 w-px bg-border" aria-hidden />
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    title="Rückgängig (Strg+Z)"
+                    aria-label="Rückgängig"
+                    disabled={state.past.length === 0}
+                    onClick={() => dispatch({ type: "undo" })}
+                  >
+                    <Undo2 />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    title="Wiederholen (Strg+Y)"
+                    aria-label="Wiederholen"
+                    disabled={state.future.length === 0}
+                    onClick={() => dispatch({ type: "redo" })}
+                  >
+                    <Redo2 />
                   </Button>
                 </div>
                 <DesignCanvas
@@ -323,12 +424,18 @@ export function EditorApp({ showLogout = false }: { showLogout?: boolean }) {
                   row={previewRow}
                   selectedId={selectedId}
                   onSelect={setSelectedId}
-                  onChange={updateElement}
+                  onGestureStart={handleGestureStart}
+                  onChange={(id, patch) => updateElement(id, patch, `${GESTURE_PREFIX}${id}`)}
                 />
-                {template.elements.length === 0 && (
+                {template.elements.length === 0 ? (
                   <p className="mt-3 text-sm text-muted-foreground">
                     <Plus className="inline size-3.5" /> Füge oben ein Textelement oder einen
                     QR-Code hinzu, um mit der Gestaltung zu beginnen.
+                  </p>
+                ) : (
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    Tipp: Element anklicken und mit den Pfeiltasten verschieben (Umschalt = 2 mm statt
+                    0,5 mm). Strg+Z macht die letzte Änderung rückgängig, Strg+Y stellt sie wieder her.
                   </p>
                 )}
               </Card>
