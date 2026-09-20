@@ -1,22 +1,20 @@
 import { Document, Page, View, Text, Svg, Path } from "@react-pdf/renderer";
-import type {
-  HorizontalAlign,
-  LabelTemplate,
-  ParsedData,
-  VerticalAlign,
-} from "@/lib/label/types";
+import type { LabelTemplate, ParsedData, VerticalAlign } from "@/lib/label/types";
 import { mm2pt } from "@/lib/label/units";
 import { resolveTemplate } from "@/lib/label/template";
 import { FONT_REGISTRY } from "@/lib/label/fonts";
 import { qrVector } from "@/lib/label/qr";
 
-function hAlignToJustify(align: HorizontalAlign) {
-  if (align === "left") return "flex-start";
-  if (align === "right") return "flex-end";
-  return "center";
-}
+/**
+ * Höhe des unsichtbaren Text-Containers in pt (ca. 2 m). react-pdf zeichnet Text nur, wenn er in die Höhe
+ * seines Containers passt - ist der Text höher als die Box (z. B. 20 pt in einer 5 mm hohen Box), wird er
+ * sonst komplett weggelassen, während die Vorschau ihn überstehen lässt. Der Container ist deshalb viel
+ * höher als jeder sinnvolle Text und wird so an der Box ausgerichtet, dass sich dieselbe vertikale
+ * Ausrichtung ergibt wie im Browser.
+ */
+const TEXT_CONTAINER_PT = 6000;
 
-function vAlignToItems(align: VerticalAlign) {
+function verticalJustify(align: VerticalAlign) {
   if (align === "top") return "flex-start";
   if (align === "bottom") return "flex-end";
   return "center";
@@ -51,26 +49,33 @@ export function LabelPdfDocument({
           />
           {template.elements.map((el) => {
             const padding = mm2pt(el.paddingMm ?? 0);
-            const boxStyle = {
-              position: "absolute" as const,
-              left: mm2pt(el.xMm),
-              top: mm2pt(el.yMm),
-              width: mm2pt(el.widthMm),
-              height: mm2pt(el.heightMm),
-              padding,
-              display: "flex" as const,
-            };
 
             if (el.type === "text") {
               const font = FONT_REGISTRY[el.fontFamily];
+              // Inhaltsfläche der Box (abzüglich Rand) - wie der gepolsterte Innenbereich in der Vorschau.
+              const contentLeft = mm2pt(el.xMm) + padding;
+              const contentWidth = Math.max(0, mm2pt(el.widthMm) - 2 * padding);
+              const contentTop = mm2pt(el.yMm) + padding;
+              const contentHeight = Math.max(0, mm2pt(el.heightMm) - 2 * padding);
+              const top =
+                el.verticalAlign === "top"
+                  ? contentTop
+                  : el.verticalAlign === "bottom"
+                    ? contentTop + contentHeight - TEXT_CONTAINER_PT
+                    : contentTop + contentHeight / 2 - TEXT_CONTAINER_PT / 2;
               return (
                 <View
                   key={el.id}
                   wrap={false}
                   style={{
-                    ...boxStyle,
-                    justifyContent: hAlignToJustify(el.align),
-                    alignItems: vAlignToItems(el.verticalAlign),
+                    position: "absolute",
+                    left: contentLeft,
+                    top,
+                    width: contentWidth,
+                    height: TEXT_CONTAINER_PT,
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: verticalJustify(el.verticalAlign),
                   }}
                 >
                   <Text
@@ -100,7 +105,17 @@ export function LabelPdfDocument({
               <View
                 key={el.id}
                 wrap={false}
-                style={{ ...boxStyle, justifyContent: "center", alignItems: "center" }}
+                style={{
+                  position: "absolute",
+                  left: mm2pt(el.xMm),
+                  top: mm2pt(el.yMm),
+                  width: mm2pt(el.widthMm),
+                  height: mm2pt(el.heightMm),
+                  padding,
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
               >
                 {qr && (
                   <Svg viewBox={`0 0 ${qr.size} ${qr.size}`} width={qrSidePt} height={qrSidePt}>
