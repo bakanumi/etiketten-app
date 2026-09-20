@@ -42,3 +42,7 @@ npm run start
 ```
 
 Läuft dann ebenfalls auf Port 3001. Kein Datenbank- oder Auth-Setup nötig.
+
+Die App hat keinen eigenen Login und legt gespeicherte Vorlagen in `data/templates.json`
+ab (Ordner per `ETIKETTEN_DATA_DIR` änderbar). Für den Betrieb hinter einer eigenen
+Domain mit SSL siehe [deploy/DEPLOY.md](deploy/DEPLOY.md) (systemd + nginx + Let's Encrypt).
