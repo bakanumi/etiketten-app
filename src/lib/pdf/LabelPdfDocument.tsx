@@ -1,4 +1,4 @@
-import { Document, Page, View, Text, Image } from "@react-pdf/renderer";
+import { Document, Page, View, Text, Svg, Path } from "@react-pdf/renderer";
 import type {
   HorizontalAlign,
   LabelTemplate,
@@ -8,6 +8,7 @@ import type {
 import { mm2pt } from "@/lib/label/units";
 import { resolveTemplate } from "@/lib/label/template";
 import { FONT_REGISTRY } from "@/lib/label/fonts";
+import { qrVector } from "@/lib/label/qr";
 
 function hAlignToJustify(align: HorizontalAlign) {
   if (align === "left") return "flex-start";
@@ -21,15 +22,12 @@ function vAlignToItems(align: VerticalAlign) {
   return "center";
 }
 
-/** qrDataUris-Key für Zeile+Element: `${rowIndex}-${elementId}`. */
 export function LabelPdfDocument({
   template,
   rows,
-  qrDataUris,
 }: {
   template: LabelTemplate;
   rows: ParsedData["rows"];
-  qrDataUris: Record<string, string>;
 }) {
   return (
     <Document>
@@ -78,7 +76,8 @@ export function LabelPdfDocument({
               );
             }
 
-            const src = qrDataUris[`${ri}-${el.id}`];
+            // Vektor-QR: gleiche Module wie in Vorschau/Druck, aber ohne Bitmap (schnell, klein, scharf).
+            const qr = qrVector(resolveTemplate(el.template, row), el.errorCorrectionLevel);
             // QR-Code bleibt quadratisch: größte Seitenlänge, die in die Box (abzüglich Rand) passt, zentriert.
             const qrSidePt = mm2pt(
               Math.max(0, Math.min(el.widthMm, el.heightMm) - 2 * (el.paddingMm ?? 0))
@@ -88,8 +87,11 @@ export function LabelPdfDocument({
                 key={el.id}
                 style={{ ...boxStyle, justifyContent: "center", alignItems: "center" }}
               >
-                {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image, kein DOM-<img> */}
-                {src && <Image src={src} style={{ width: qrSidePt, height: qrSidePt }} />}
+                {qr && (
+                  <Svg viewBox={`0 0 ${qr.size} ${qr.size}`} width={qrSidePt} height={qrSidePt}>
+                    <Path d={qr.path} fill="#000000" />
+                  </Svg>
+                )}
               </View>
             );
           })}

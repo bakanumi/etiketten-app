@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useMemo, type CSSProperties } from "react";
 import type {
   HorizontalAlign,
   LabelElement,
@@ -10,7 +10,7 @@ import type {
 } from "@/lib/label/types";
 import { resolveTemplate } from "@/lib/label/template";
 import { FONT_REGISTRY } from "@/lib/label/fonts";
-import { qrDataUri } from "@/lib/label/qr";
+import { qrVector } from "@/lib/label/qr";
 
 function hAlignToJustify(align: HorizontalAlign): CSSProperties["justifyContent"] {
   if (align === "left") return "flex-start";
@@ -111,30 +111,20 @@ function QrImage({
   value: string;
   errorCorrectionLevel?: QrErrorCorrection;
 }) {
-  const [src, setSrc] = useState<string | null>(null);
+  const qr = useMemo(() => qrVector(value, errorCorrectionLevel), [value, errorCorrectionLevel]);
 
-  useEffect(() => {
-    let active = true;
-    qrDataUri(value, errorCorrectionLevel).then((uri) => {
-      if (active) setSrc(uri);
-    });
-    return () => {
-      active = false;
-    };
-  }, [value, errorCorrectionLevel]);
-
-  if (!src) return null;
+  // Inhalt zu lang für einen QR-Code -> Feld bleibt leer (statt die Seite zu crashen).
+  if (!qr) return null;
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- data: URI, next/image bringt hier keinen Vorteil
-    <img
-      src={src}
-      alt=""
-      style={{
-        width: "100%",
-        height: "100%",
-        objectFit: "contain",
-        imageRendering: "pixelated", // scharfe Modulkanten statt weichgezeichnet
-      }}
-    />
+    <svg
+      viewBox={`0 0 ${qr.size} ${qr.size}`}
+      width="100%"
+      height="100%"
+      preserveAspectRatio="xMidYMid meet"
+      shapeRendering="crispEdges"
+      aria-hidden
+    >
+      <path d={qr.path} fill="#000" />
+    </svg>
   );
 }

@@ -23,7 +23,14 @@ export function PdfDownloadButton({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ template, data }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        // Eigene Fehlermeldung der App anzeigen; bei Proxy-Fehlern (z. B. 504 von nginx) kommt kein JSON.
+        const message = await res
+          .json()
+          .then((j: { error?: string }) => j.error)
+          .catch(() => undefined);
+        throw new Error(message ?? `Der Server antwortet nicht (Status ${res.status})`);
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -35,7 +42,7 @@ export function PdfDownloadButton({
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error(err);
-      toast.error("PDF konnte nicht erstellt werden");
+      toast.error(err instanceof Error && err.message ? err.message : "PDF konnte nicht erstellt werden");
     } finally {
       setLoading(false);
     }
