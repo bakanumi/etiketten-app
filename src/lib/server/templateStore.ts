@@ -6,7 +6,7 @@ import type { ParseOptions } from "@/lib/parse/parseInput";
 import type { SavedTemplate } from "@/lib/templates/types";
 
 /** Speicherort der Vorlagen; per ETIKETTEN_DATA_DIR änderbar (Standard: ./data im Projektordner). */
-const DATA_DIR = process.env.ETIKETTEN_DATA_DIR ?? path.join(process.cwd(), "data");
+export const DATA_DIR = process.env.ETIKETTEN_DATA_DIR ?? path.join(process.cwd(), "data");
 const FILE = path.join(DATA_DIR, "templates.json");
 
 // Schreibzugriffe nacheinander abarbeiten, damit gleichzeitige Requests sich nicht überschreiben.

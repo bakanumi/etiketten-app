@@ -19,6 +19,8 @@ export async function renderLabelPdf(
 ): Promise<Buffer> {
   registerLabelFonts();
 
+  // Start-Zeile: fehlt im Log das folgende "PDF: ... in ... ms", hat die Erstellung nie geendet.
+  console.log(`PDF: Start mit ${rows.length} Etiketten`);
   const started = Date.now();
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {

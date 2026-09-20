@@ -126,6 +126,11 @@ sudo nginx -t
 sudo tail -n 30 /var/log/nginx/error.log
 ```
 
+Im angemeldeten Browser zeigt `https://labels.aylins-makerspace.de/api/health` die Umgebung des
+Servers (Node-Version, freier Arbeitsspeicher, Auslastung, Schriften, Speicherordner) und erzeugt
+ein Test-PDF mit Zeitmessung. Läuft es dort durch, liegt ein Problem eher an den Daten; hängt es,
+liegt es an der Umgebung.
+
 Im Journal steht bei jedem PDF-Export eine Zeile mit Anzahl der Etiketten und Dauer
 (`PDF: 22 Etiketten in 132 ms`). Dauert die Erstellung länger als 50 Sekunden, bricht die App
 ab und zeigt im Browser eine verständliche Meldung statt eines 504-Fehlers.
