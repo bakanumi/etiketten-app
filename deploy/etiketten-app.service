@@ -16,6 +16,10 @@ EnvironmentFile=/etc/etiketten-app.env
 ExecStart=/usr/bin/node node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3001
 Restart=always
 RestartSec=5
+# Schutz vor Ausreißern: ein hängender Export darf nicht den ganzen Server (Makerspace Manager, ECO)
+# belasten. Node bricht bei 512 MB Heap ab, systemd begrenzt den Dienst hart auf 768 MB.
+Environment=NODE_OPTIONS=--max-old-space-size=512
+MemoryMax=768M
 NoNewPrivileges=true
 PrivateTmp=true
 

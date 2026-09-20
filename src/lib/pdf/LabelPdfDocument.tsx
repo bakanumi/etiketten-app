@@ -32,10 +32,14 @@ export function LabelPdfDocument({
   return (
     <Document>
       {rows.map((row, ri) => (
+        // wrap={false}: jedes Etikett ist genau eine Seite. Ohne das versucht react-pdf, Elemente, die nicht
+        // (ganz) auf die Seite passen, auf Folgeseiten umzubrechen - bei absolut positionierten Elementen
+        // außerhalb des Etiketts endet das in einer Endlosschleife (100 % CPU, dann Speicher voll).
         <Page
           key={ri}
           size={[mm2pt(template.widthMm), mm2pt(template.heightMm)]}
           style={{ padding: 0 }}
+          wrap={false}
         >
           {template.elements.map((el) => {
             const padding = mm2pt(el.paddingMm ?? 0);
@@ -54,6 +58,7 @@ export function LabelPdfDocument({
               return (
                 <View
                   key={el.id}
+                  wrap={false}
                   style={{
                     ...boxStyle,
                     justifyContent: hAlignToJustify(el.align),
@@ -61,6 +66,7 @@ export function LabelPdfDocument({
                   }}
                 >
                   <Text
+                    wrap={false}
                     style={{
                       fontFamily: font.pdfFamily,
                       fontWeight: el.bold ? "bold" : "normal",
@@ -85,6 +91,7 @@ export function LabelPdfDocument({
             return (
               <View
                 key={el.id}
+                wrap={false}
                 style={{ ...boxStyle, justifyContent: "center", alignItems: "center" }}
               >
                 {qr && (

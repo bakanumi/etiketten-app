@@ -47,6 +47,18 @@ const DEFAULT_FORM: PersistedShape = {
 
 const THUMBNAIL_LIMIT = 12;
 
+/** Kleine Toleranz, damit Rundungen (z. B. 22.00001 mm) nicht als "außerhalb" gelten. */
+const OUTSIDE_TOLERANCE_MM = 0.05;
+
+function isOutsideLabel(el: LabelElement, t: LabelTemplate): boolean {
+  return (
+    el.xMm < -OUTSIDE_TOLERANCE_MM ||
+    el.yMm < -OUTSIDE_TOLERANCE_MM ||
+    el.xMm + el.widthMm > t.widthMm + OUTSIDE_TOLERANCE_MM ||
+    el.yMm + el.heightMm > t.heightMm + OUTSIDE_TOLERANCE_MM
+  );
+}
+
 /** Standard-Textblock: alle Werte einer Datenzeile untereinander, zentriert über das ganze Etikett. */
 function withDefaultTextBlock(template: LabelTemplate): LabelTemplate {
   const block = createTextElement({
@@ -166,6 +178,26 @@ export function EditorApp({ showLogout = false }: { showLogout?: boolean }) {
     });
   };
 
+  /** Elemente, die (teilweise) über den Rand des Etiketts hinausragen, z. B. nach dem Verkleinern des Etiketts. */
+  const outsideCount = template.elements.filter((el) => isOutsideLabel(el, template)).length;
+
+  const pullElementsInside = () => {
+    setTemplate((t) => ({
+      ...t,
+      elements: t.elements.map((el) => {
+        const widthMm = Math.min(el.widthMm, t.widthMm);
+        const heightMm = Math.min(el.heightMm, t.heightMm);
+        return {
+          ...el,
+          widthMm,
+          heightMm,
+          xMm: Math.min(Math.max(el.xMm, 0), t.widthMm - widthMm),
+          yMm: Math.min(Math.max(el.yMm, 0), t.heightMm - heightMm),
+        };
+      }),
+    }));
+  };
+
   const deleteSelected = () => {
     if (!selectedId) return;
     setTemplate((t) => ({ ...t, elements: t.elements.filter((el) => el.id !== selectedId) }));
@@ -262,6 +294,18 @@ export function EditorApp({ showLogout = false }: { showLogout?: boolean }) {
                 heightMm={template.heightMm}
                 onChange={(patch) => setTemplate((t) => ({ ...t, ...patch }))}
               />
+              {outsideCount > 0 && (
+                <div className="flex flex-wrap items-center gap-3 text-sm text-amber-400">
+                  <span>
+                    {outsideCount === 1
+                      ? "1 Element ragt über den Rand des Etiketts hinaus."
+                      : `${outsideCount} Elemente ragen über den Rand des Etiketts hinaus.`}
+                  </span>
+                  <Button variant="outline" size="sm" onClick={pullElementsInside}>
+                    Ins Etikett zurückholen
+                  </Button>
+                </div>
+              )}
             </Card>
 
             <div className="flex flex-col gap-3 lg:flex-row">
